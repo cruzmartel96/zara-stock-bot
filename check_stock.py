@@ -24,7 +24,7 @@ TARGET_SIZES = {
     464886564: "XL"
 }
 
-STATE_FILE = "state.json"
+STATE_FILE = "/tmp/state.json"  # local to runner
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0",
@@ -67,24 +67,23 @@ def save_state(state):
 # -------------------------
 
 def check_stock():
-    # fix for NameError: always load state first
-    state = load_state()
+    state = load_state()  # always loaded at the top
     backoff = INITIAL_BACKOFF
 
     for attempt in range(1, MAX_RETRIES + 1):
         try:
             response = requests.get(AVAILABILITY_URL, headers=HEADERS, timeout=TIMEOUT)
 
-            # --------------- HANDLE BLOCKED / NON-200 STATUS ---------------
+            # ----------------- HANDLE BLOCKED / NON-200 STATUS -----------------
             if response.status_code != 200:
                 msg = f"⚠️ Zara blocked this run (status {response.status_code}, attempt {attempt}/{MAX_RETRIES})"
                 print(msg)
                 send_telegram(msg)
-                save_state(state)  # state is now always defined
+                save_state(state)
                 return
 
-            # optional silent logging
-            with open("zara_last_response.json", "w") as f:
+            # silent log of Zara JSON
+            with open("/tmp/zara_last_response.json", "w") as f:
                 json.dump(response.json(), f)
 
             # parse sizes
@@ -99,11 +98,10 @@ def check_stock():
                     send_telegram(f"🟢 Zara alert! Size {TARGET_SIZES[size_id]} is IN STOCK 🎉")
                     state["notified"][str(size_id)] = True
 
-                # reset notification if out of stock
                 if size_id in TARGET_SIZES and availability != "in_stock":
                     state["notified"][str(size_id)] = False
 
-            # --------------- DAILY HEARTBEAT ---------------
+            # ----------------- DAILY HEARTBEAT -----------------
             today = datetime.now(timezone.utc).date().isoformat()
             if state.get("last_heartbeat") != today:
                 send_telegram("💓 Zara bot is alive — still checking stock")
@@ -127,3 +125,4 @@ def check_stock():
 
 if __name__ == "__main__":
     check_stock()
+
