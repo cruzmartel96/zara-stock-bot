@@ -1,52 +1,75 @@
 import os
+import json
 import requests
+from datetime import datetime, timezone
 
 BOT_TOKEN = os.environ["BOT_TOKEN"]
 CHAT_ID = os.environ["CHAT_ID"]
 
-PRODUCT_ID = 464886560  # XS
-STORE_ID = 10703        # Spain
+# Zara availability endpoint you already discovered
+AVAILABILITY_URL = "https://www.zara.com/es/es/products/availability"
 
-URL = f"https://www.zara.com/itxrest/2/catalog/store/{STORE_ID}/product/{PRODUCT_ID}/detail"
+TARGET_SKUS = {
+    464886562: "M",
+    464886563: "L",
+    464886564: "XL"
+}
+
+STATE_FILE = "state.json"
 
 
-def send_telegram(msg):
+def send_telegram(message):
     requests.post(
         f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
-        data={
-            "chat_id": CHAT_ID,
-            "text": msg
-        },
+        data={"chat_id": CHAT_ID, "text": message},
         timeout=10
     )
 
 
+def load_state():
+    if not os.path.exists(STATE_FILE):
+        return {"notified": {}, "last_heartbeat": None}
+    with open(STATE_FILE, "r") as f:
+        return json.load(f)
+
+
+def save_state(state):
+    with open(STATE_FILE, "w") as f:
+        json.dump(state, f)
+
+
 def check_stock():
-    headers = {
-        "User-Agent": "Mozilla/5.0",
-        "Accept": "application/json"
-    }
+    state = load_state()
 
-    r = requests.get(URL, headers=headers, timeout=15)
-
-    if r.status_code != 200:
-        print(f"Zara returned {r.status_code}")
-        return
-
+    r = requests.get(AVAILABILITY_URL, timeout=15)
+    r.raise_for_status()
     data = r.json()
 
-    for size in data.get("sizeAvailability", []):
-        if size.get("sizeId") == PRODUCT_ID:
-            status = size.get("availability")
-            print("Stock status:", status)
+    availability = {
+        item["sku"]: item["availability"]
+        for item in data.get("skusAvailability", [])
+    }
 
-            if status == "in_stock":
-                send_telegram("🛍️ Zara alert: XS is BACK IN STOCK!")
-            return
+    for sku, size in TARGET_SKUS.items():
+        status = availability.get(sku)
+        previously_notified = state["notified"].get(str(sku), False)
 
-    print("Size not found")
+        if status == "in_stock" and not previously_notified:
+            send_telegram(f"🛍️ Zara alert: size {size} is BACK IN STOCK!")
+            state["notified"][str(sku)] = True
+
+        if status != "in_stock":
+            state["notified"][str(sku)] = False
+
+
+    # 💓 Daily heartbeat
+    today = datetime.now(timezone.utc).date().isoformat()
+    if state["last_heartbeat"] != today:
+        send_telegram("💓 Zara bot is alive — still checking stock")
+        state["last_heartbeat"] = today
+
+    save_state(state)
 
 
 if __name__ == "__main__":
     check_stock()
-
