@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 BOT_TOKEN = os.environ["BOT_TOKEN"]
 CHAT_ID = os.environ["CHAT_ID"]
 
-AVAILABILITY_URL = "https://www.zara.com/es/es/products/availability"
+AVAILABILITY_URL = "https://www.zara.com/itxrest/2/catalog/store/10703/product/464887739/availability"
 
 TARGET_SKUS = {
     464886562: "M",
