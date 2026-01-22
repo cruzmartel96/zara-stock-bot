@@ -13,7 +13,7 @@ SKUS = {
     "XL": 464886564
 }
 
-AVAILABILITY_URL = "https://www.zara.com/es/es/products/availability"
+AVAILABILITY_URL = "https://www.zara.com/ecommerce/product/availability"
 STATE_FILE = "state.json"
 
 
