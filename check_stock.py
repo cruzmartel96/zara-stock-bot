@@ -40,10 +40,28 @@ def save_state(state):
 def check_stock():
     state = load_state()
 
-    payload = {"skus": list(SKUS.values())}
-    headers = {"User-Agent": "Mozilla/5.0"}
+   params = {
+    "market": "es",
+    "locale": "es",
+}
 
-    r = requests.post(AVAILABILITY_URL, json=payload, headers=headers, timeout=15)
+payload = {
+    "skus": list(SKUS.values())
+}
+
+headers = {
+    "User-Agent": "Mozilla/5.0",
+    "Content-Type": "application/json"
+}
+
+r = requests.post(
+    AVAILABILITY_URL,
+    params=params,
+    json=payload,
+    headers=headers,
+    timeout=15
+)
+
     r.raise_for_status()
     data = r.json()
 
